@@ -3,16 +3,6 @@
 A Python library for elegant 3D medical image geometric transformations.
 
 
-## Install
-pure numpy lib, space operation, point warping
-```
-pip install spacetransformer-core 
-```
-
-torch-gpu lib, image warping between spaces.
-```
-pip install spacetransformer-torch
-```
 
 ## Why SpaceTransformer?
 
@@ -118,7 +108,7 @@ transformed_image = warp_image(
 ## Format Support
 
 - **DICOM**: `Space.from_dicom(dicom_dataset)`
-- **NIfTI**: `Space.from_nifty(nifti_image)`
+- **NIfTI**: `Space.from_nifti(nifti_image)`
 - **SimpleITK**: `Space.from_sitk(sitk_image)`
 
 ## Installation
@@ -131,7 +121,7 @@ pip install spacetransformer-torch     # GPU acceleration
 ## Requirements
 
 - **Core**: Python ≥3.8, NumPy ≥1.20
-- **Torch**: PyTorch ≥1.12
+- **Torch**: PyTorch ≥1.12 (spacetransformer-torch)
 
 ---
 

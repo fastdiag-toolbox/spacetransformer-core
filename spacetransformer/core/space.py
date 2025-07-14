@@ -63,9 +63,9 @@ class Space:
         shape: Image dimensions (height, width, depth) in voxels
         origin: Physical coordinates (x,y,z) of the first voxel in mm
         spacing: Physical size (x,y,z) of each voxel in mm
-        x_orientation: Direction cosines of the x-axis
-        y_orientation: Direction cosines of the y-axis
-        z_orientation: Direction cosines of the z-axis
+        x_orientation: Direction cosines of axis 0 (x-axis)
+        y_orientation: Direction cosines of axis 1 (y-axis)
+        z_orientation: Direction cosines of axis 2 (z-axis)
         
     Example:
         Creating a space for a typical CT scan:
@@ -243,11 +243,11 @@ class Space:
         return get_space_from_sitk(simpleitkimage)
     
     @classmethod
-    def from_nifty(cls, niftyimage) -> "Space":
+    def from_nifti(cls, niftiimage) -> "Space":
         """Create a Space object from a NIfTI image.
         
         Args:
-            niftyimage: NIfTI image object
+            niftiimage: NIfTI image object
 
         Returns:
             Space: A new Space instance with geometry matching the NIfTI image
@@ -255,11 +255,11 @@ class Space:
         Example:
             >>> import nibabel as nib
             >>> image = nib.load('image.nii.gz')
-            >>> space = Space.from_nifty(image)
+            >>> space = Space.from_nifti(image)
             >>> print(space.shape)
             (100, 100, 50)
         """
-        return get_space_from_nifty(niftyimage)
+        return get_space_from_nifti(niftiimage)
 
     def to_sitk_direction(self) -> Tuple[float, ...]:
         """Convert orientation vectors to SimpleITK direction matrix format.
@@ -284,7 +284,7 @@ class Space:
         z = self.z_orientation
         return (x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2])
 
-    def to_nifty_affine(self) -> np.ndarray:
+    def to_nifti_affine(self) -> np.ndarray:
         """Convert space information to NIfTI affine transformation matrix.
         
         The affine matrix combines rotation, scaling, and translation into a single
@@ -295,7 +295,7 @@ class Space:
             
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
-            >>> affine = space.to_nifty_affine()
+            >>> affine = space.to_nifti_affine()
             >>> print(affine.shape)
             (4, 4)
             >>> print(affine[0, 0])  # x-spacing
@@ -989,14 +989,14 @@ class Space:
         return self.contain_pointset_ind(pts_idx)
 
 
-def get_space_from_nifty(niftyimage: "NiftiImage") -> "Space":
+def get_space_from_nifti(niftiimage: "NiftiImage") -> "Space":
     """Create a Space object from a NIfTI image.
     
     This function extracts geometric information from a NIfTI image including
     orientation, spacing, and origin information from the affine matrix.
     
     Args:
-        niftyimage: NIfTI image object with affine matrix and shape
+        niftiimage: NIfTI image object with affine matrix and shape
         
     Returns:
         Space: A new Space instance with geometry matching the NIfTI image
@@ -1007,14 +1007,14 @@ def get_space_from_nifty(niftyimage: "NiftiImage") -> "Space":
     Example:
         >>> import nibabel as nib
         >>> image = nib.load('brain.nii.gz')
-        >>> space = get_space_from_nifty(image)
+        >>> space = get_space_from_nifti(image)
         >>> print(space.shape)
         (256, 256, 256)
         >>> print(space.spacing)
         (1.0, 1.0, 1.0)
     """
-    affine = niftyimage.affine
-    shape = niftyimage.shape
+    affine = niftiimage.affine
+    shape = niftiimage.shape
 
     if affine.shape != (4, 4):
         raise ValueError("Affine matrix must be 4x4.")
