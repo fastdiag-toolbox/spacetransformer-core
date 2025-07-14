@@ -1,18 +1,34 @@
-# SpaceTransformer Core
+# SpaceTransformer
 
-Pure NumPy implementation of SpaceTransformer for geometric computations and 3D medical image transformations.
+A Python library for elegant 3D medical image geometric transformations.
 
-## Overview
 
-SpaceTransformer Core provides the fundamental `Space` concept - a complete description of 3D image geometry that goes beyond traditional "frame" concepts to include shape information.
+## Install
+pure numpy lib, space operation, point warping
+```
+pip install spacetransformer-core 
+```
 
-## Key Features
+torch-gpu lib, image warping between spaces.
+```
+pip install spacetransformer-torch
+```
+
+## Why SpaceTransformer?
+
+Traditional medical image processing suffers from fragmented coordinate concepts:
+
+- **Frame**: Only captures position/orientation, missing crucial **shape** information
+- **NIfTI Affine**: A 4x4 matrix that's hard to interpret - what does each element mean?
+- **Manual bookkeeping**: Keeping track of transformations across multiple processing steps
+
+SpaceTransformer introduces the **Space** concept - a complete description of 3D image geometry.
+
+## Key Advantages
 
 ### 1. Complete Geometric Description
 Unlike traditional "frame" concepts, `Space` fully describes the image sampling grid:
 ```python
-from spacetransformer.core import Space
-
 space = Space(
     shape=(512, 512, 100),           # Complete voxel dimensions
     origin=(0.0, 0.0, 0.0),         # Physical position
@@ -36,23 +52,51 @@ transformed_space = (space
 ### 3. Transparent Matrix Interpretation
 No more guessing what a 4x4 affine matrix means - direction vectors are explicit.
 
-## Core Components
+## Elegant Image Processing
 
-- **Space**: Complete 3D image geometry representation
-- **Transform**: 4x4 homogeneous coordinate transformations with lazy inverse computation
-- **Point/Vector Operations**: Coordinate transformations and spatial relationship checking
+### 1. Worry-Free Multi-Step Pipelines
+```python
+# Traditional approach: careful bookkeeping required
+# crop -> resize -> segmentation -> resize back -> pad back
 
-## Format Support
+# SpaceTransformer approach: fully reversible by design
+cropped_space = original_space.apply_crop(bbox)
+resized_space = cropped_space.apply_resize(target_size)
+warped_img = warp_image(original_img, original_space, resized_space)
+# ... process in resized_space ...
+segment_result = segmodel(warped_img)
+keypoint_result = keypmodel(warped_img) # [i,j,k]
+# Automatic optimal path back to original_space
+final_segment_result = warp_image(segment_result, resized_space, original_space)
+final_keypoint_result = warp_point(keypoint_result, resized_space, original_space)
+keypoint_world_coord = resized_space.to_world_transform(keypoint_result) # [x,y,z]
+```
 
-- **DICOM**: `Space.from_dicom(dicom_dataset)`
-- **NIfTI**: `Space.from_nifty(nifti_image)`
-- **SimpleITK**: `Space.from_sitk(sitk_image)`
+### 2. Abstract-Then-Execute Pattern
+```python
+# Plan transformations (fast, no actual image processing)
+target_space = source_space.apply_flip(0).apply_rotate(1, 30).apply_crop(bbox).apply_resize((256, 256, 128))
+
+# Execute once with optimal path (GPU-accelerated)
+result = warp_image(image, source_space, target_space, cuda_device="cuda:0")
+```
+
+### 3. GPU-Accelerated & Deep Learning Ready
+- PyTorch backend with automatic optimal transformation paths
+- No `align_corners` confusion - transformations are mathematically guaranteed reversible
+- Seamless integration with deep learning workflows
+
+## Architecture
+
+- **spacetransformer-core**: Pure NumPy implementation for geometric computations
+- **spacetransformer-torch**: GPU-accelerated image resampling with PyTorch
 
 ## Quick Start
 
 ```python
 import numpy as np
-from spacetransformer.core import Space, Transform
+from spacetransformer.core import Space
+from spacetransformer.torch import warp_image
 
 # Create image space
 space = Space(
@@ -61,40 +105,34 @@ space = Space(
     origin=(0, 0, 0)
 )
 
-# Define transformations
+# Define target transformation
 target_space = space.apply_flip(axis=2).apply_resize((256, 256, 50))
 
-# Get transformation matrix
-transform = space.get_transform_to(target_space)
-print(f"Transform matrix:\n{transform.matrix}")
-
-# Transform coordinates
-points = np.array([[100, 200, 50], [150, 250, 60]])
-transformed_points = transform.transform_points(points)
+# Apply to image (GPU-accelerated)
+transformed_image = warp_image(
+    image, space, target_space, 
+    pad_value=0, cuda_device="cuda:0"
+)
 ```
+
+## Format Support
+
+- **DICOM**: `Space.from_dicom(dicom_dataset)`
+- **NIfTI**: `Space.from_nifty(nifti_image)`
+- **SimpleITK**: `Space.from_sitk(sitk_image)`
 
 ## Installation
 
 ```bash
-pip install spacetransformer-core
+pip install spacetransformer-core      # Core functionality
+pip install spacetransformer-torch     # GPU acceleration
 ```
 
 ## Requirements
 
-- Python ≥3.8
-- NumPy ≥1.20
-
-## GPU Acceleration
-
-For GPU-accelerated image resampling, install the companion package:
-```bash
-pip install spacetransformer-torch
-```
-
-## License
-
-MIT License
+- **Core**: Python ≥3.8, NumPy ≥1.20
+- **Torch**: PyTorch ≥1.12
 
 ---
 
-*SpaceTransformer Core: Elegant geometric computations for 3D medical images.* 
+*SpaceTransformer: Making 3D medical image transformations as elegant as they should be.* 

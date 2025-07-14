@@ -56,6 +56,83 @@ class TestTransform(unittest.TestCase):
         expected = (mat[:3, :3] @ vecs.T).T
         self.assertTrue(np.allclose(out, expected, atol=1e-6))
 
+    def test_apply_points_list_tuple_input(self):
+        """测试 apply_points 对 list 和 tuple 输入的处理"""
+        mat = self._random_matrix()
+        T = Transform(mat)
+        
+        # 测试单个点 (list)
+        point_list = [1.0, 2.0, 3.0]
+        result_list = T.apply_points(point_list)
+        self.assertEqual(result_list.shape, (1, 3))
+        
+        # 测试单个点 (tuple)
+        point_tuple = (1.0, 2.0, 3.0)
+        result_tuple = T.apply_points(point_tuple)
+        self.assertEqual(result_tuple.shape, (1, 3))
+        
+        # 验证 list 和 tuple 结果一致
+        self.assertTrue(np.allclose(result_list, result_tuple, atol=1e-6))
+        
+        # 测试与 numpy 数组结果一致
+        point_array = np.array([1.0, 2.0, 3.0])
+        result_array = T.apply_points(point_array)
+        self.assertTrue(np.allclose(result_list, result_array, atol=1e-6))
+        
+        # 测试多个点 (list of lists)
+        points_list = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+        result_multi = T.apply_points(points_list)
+        self.assertEqual(result_multi.shape, (2, 3))
+        
+        # 验证与 numpy 数组结果一致
+        points_array = np.array(points_list)
+        result_multi_array = T.apply_points(points_array)
+        self.assertTrue(np.allclose(result_multi, result_multi_array, atol=1e-6))
+
+    def test_apply_vectors_list_tuple_input(self):
+        """测试 apply_vectors 对 list 和 tuple 输入的处理"""
+        mat = self._random_matrix()
+        T = Transform(mat)
+        
+        # 测试单个向量 (list)
+        vec_list = [1.0, 0.0, 0.0]
+        result_list = T.apply_vectors(vec_list)
+        self.assertEqual(result_list.shape, (1, 3))
+        
+        # 测试单个向量 (tuple)
+        vec_tuple = (1.0, 0.0, 0.0)
+        result_tuple = T.apply_vectors(vec_tuple)
+        self.assertEqual(result_tuple.shape, (1, 3))
+        
+        # 验证 list 和 tuple 结果一致
+        self.assertTrue(np.allclose(result_list, result_tuple, atol=1e-6))
+        
+        # 测试与 numpy 数组结果一致
+        vec_array = np.array([1.0, 0.0, 0.0])
+        result_array = T.apply_vectors(vec_array)
+        self.assertTrue(np.allclose(result_list, result_array, atol=1e-6))
+        
+        # 测试多个向量 (list of lists)
+        vecs_list = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+        result_multi = T.apply_vectors(vecs_list)
+        self.assertEqual(result_multi.shape, (2, 3))
+        
+        # 验证与 numpy 数组结果一致
+        vecs_array = np.array(vecs_list)
+        result_multi_array = T.apply_vectors(vecs_array)
+        self.assertTrue(np.allclose(result_multi, result_multi_array, atol=1e-6))
+
+    def test_call_method_list_tuple_input(self):
+        """测试 __call__ 方法对 list 和 tuple 输入的处理"""
+        mat = self._random_matrix()
+        T = Transform(mat)
+        
+        # 测试 __call__ 方法与 apply_points 的一致性
+        point_list = [1.0, 2.0, 3.0]
+        result_call = T(point_list)
+        result_apply = T.apply_points(point_list)
+        self.assertTrue(np.allclose(result_call, result_apply, atol=1e-6))
+
 
 if __name__ == "__main__":
     unittest.main() 
