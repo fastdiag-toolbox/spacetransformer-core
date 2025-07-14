@@ -51,13 +51,23 @@ No more guessing what a 4x4 affine matrix means - direction vectors are explicit
 
 # SpaceTransformer approach: fully reversible by design
 target_space = original_space.apply_crop(bbox).apply_resize(target_size)
-warped_img = warp_image(original_img, original_space, target_space, mode='linear', pad_value=-1000)
+warped_img = warp_image(original_img, 
+                        original_space, 
+                        target_space, 
+                        mode='linear', 
+                        pad_value=-1000)
 # ... process in target_space ...
 segment_result = segmodel(warped_img) # hxwxl, int
 keypoint_result = keypmodel(warped_img) # nx3, [i,j,k], index coord
 # Automatic optimal path back to original_space
-original_segment_result = warp_image(segment_result, target_space, original_space, mode='nearest', pad_value = 0)
-original_keypoint_result = warp_point(keypoint_result, target_space, original_space) # nx3, index coord 
+original_segment_result = warp_image(segment_result, 
+                                     target_space, 
+                                     original_space, 
+                                     mode='nearest', 
+                                     pad_value = 0)
+original_keypoint_result = warp_point(keypoint_result, 
+                                      target_space, 
+                                      original_space) # nx3, index coord 
 world_keypoint_result = target_space.to_world_transform(keypoint_result) # nx3, [x,y,z], mm
 ```
 
@@ -106,7 +116,6 @@ transformed_image = warp_image(
 
 ## Format Support
 
-- **DICOM**: `Space.from_dicom(dicom_dataset)`
 - **NIfTI**: `Space.from_nifti(nifti_image)`
 - **SimpleITK**: `Space.from_sitk(sitk_image)`
 
