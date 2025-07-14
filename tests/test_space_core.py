@@ -30,8 +30,8 @@ class TestSpace(unittest.TestCase):
 
     def test_world_index_roundtrip(self):
         idx = np.random.rand(20, 3) * (np.array(self.sp.shape) - 1)
-        world = self.sp.to_world_transform.apply_points(idx)
-        idx_back = self.sp.from_world_transform.apply_points(world)
+        world = self.sp.to_world_transform.apply_piont(idx)
+        idx_back = self.sp.from_world_transform.apply_piont(world)
         self.assertTrue(np.allclose(idx, idx_back, atol=1e-5))
 
     def test_physical_span_end(self):

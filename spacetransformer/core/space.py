@@ -31,7 +31,7 @@ Example:
     ... )
     >>> transform = space.to_world_transform
     >>> points = [[0, 0, 0], [10, 10, 10]]
-    >>> world_points = transform.apply_points(points)
+    >>> world_points = transform.apply_piont(points)
 """
 
 import json
@@ -81,8 +81,8 @@ class Space:
         Transform between index and world coordinates:
         
         >>> index_points = [[0, 0, 0], [10, 10, 10]]
-        >>> world_points = space.to_world_transform.apply_points(index_points)
-        >>> back_to_index = space.from_world_transform.apply_points(world_points)
+        >>> world_points = space.to_world_transform.apply_piont(index_points)
+        >>> back_to_index = space.from_world_transform.apply_piont(world_points)
     """
 
     shape: Tuple[int, int, int]
@@ -376,7 +376,7 @@ class Space:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
             >>> transform = space.to_world_transform
             >>> index_points = [[0, 0, 0], [10, 10, 10]]
-            >>> world_points = transform.apply_points(index_points)
+            >>> world_points = transform.apply_piont(index_points)
             >>> print(world_points[1])  # Point at index (10, 10, 10)
             [10. 10. 20.]
         """
@@ -403,7 +403,7 @@ class Space:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
             >>> transform = space.from_world_transform
             >>> world_points = [[10.0, 10.0, 20.0]]
-            >>> index_points = transform.apply_points(world_points)
+            >>> index_points = transform.apply_piont(world_points)
             >>> print(index_points[0])  # Should be [10, 10, 10]
             [10. 10. 10.]
         """
@@ -985,7 +985,7 @@ class Space:
             >>> print(inside)
             [True False]
         """
-        pts_idx = self.from_world_transform.apply_points(pointset_world)
+        pts_idx = self.from_world_transform.apply_piont(pointset_world)
         return self.contain_pointset_ind(pts_idx)
 
 

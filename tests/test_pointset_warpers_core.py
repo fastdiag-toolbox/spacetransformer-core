@@ -32,7 +32,7 @@ class TestPointWarpers(unittest.TestCase):
         T = calc_transform(s, t)
         pts = np.random.rand(30, 3) * (np.array(s.shape) - 1)
         warp1, _ = warp_point(pts, s, t)
-        warp2 = T.apply_points(pts)
+        warp2 = T.apply_piont(pts)
         self.assertTrue(np.allclose(warp1, warp2, atol=1e-5))
 
     def test_warp_vector(self):
@@ -41,7 +41,7 @@ class TestPointWarpers(unittest.TestCase):
         vecs = np.random.randn(40, 3)
         T = calc_transform(s, t)
         warp1 = warp_vector(vecs, s, t)
-        warp2 = T.apply_vectors(vecs)
+        warp2 = T.apply_vector(vecs)
         self.assertTrue(np.allclose(warp1, warp2, atol=1e-5))
 
     def test_warp_point_list_tuple_input(self):

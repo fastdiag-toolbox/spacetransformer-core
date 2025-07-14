@@ -21,7 +21,7 @@ Example:
     >>> matrix = np.eye(4)
     >>> transform = Transform(matrix)
     >>> points = [[0, 0, 0], [1, 1, 1]]
-    >>> transformed = transform.apply_points(points)
+    >>> transformed = transform.apply_piont(points)
     >>> print(transformed)
     [[0. 0. 0.]
      [1. 1. 1.]]
@@ -110,7 +110,7 @@ class Transform:
         ...                    [0, 0, 0, 1]])
         >>> transform = Transform(matrix)
         >>> point = [0, 0, 0]
-        >>> transformed = transform.apply_points(point)
+        >>> transformed = transform.apply_piont(point)
         >>> print(transformed)
         [[10. 20. 30.]]
     """
@@ -217,7 +217,7 @@ class Transform:
     # ------------------------------------------------------------------
     # Apply to points / vectors
     # ------------------------------------------------------------------
-    def apply_points(self, pts: ArrayLike) -> np.ndarray:
+    def apply_piont(self, pts: ArrayLike) -> np.ndarray:
         """Apply transformation to a set of points.
         
         This method transforms 3D points using the 4x4 transformation matrix.
@@ -238,7 +238,7 @@ class Transform:
             ...                    [0, 0, 0, 1]])
             >>> transform = Transform(matrix)
             >>> points = [[0, 0, 0], [1, 1, 1]]
-            >>> transformed = transform.apply_points(points)
+            >>> transformed = transform.apply_piont(points)
             >>> print(transformed)
             [[10. 20. 30.]
              [11. 21. 31.]]
@@ -247,7 +247,7 @@ class Transform:
         out = (self.matrix @ pts_h.T).T[:, :3]
         return out
 
-    def apply_vectors(self, vecs: ArrayLike) -> np.ndarray:
+    def apply_vector(self, vecs: ArrayLike) -> np.ndarray:
         """Apply transformation to a set of vectors (ignoring translation).
         
         This method transforms 3D vectors using only the rotational part
@@ -268,7 +268,7 @@ class Transform:
             ...                    [0, 0, 0, 1]])
             >>> transform = Transform(matrix)
             >>> vectors = [[1, 0, 0], [0, 1, 0]]
-            >>> transformed = transform.apply_vectors(vectors)
+            >>> transformed = transform.apply_vector(vectors)
             >>> print(transformed)
             [[1. 0. 0.]
              [0. 1. 0.]]
@@ -281,7 +281,7 @@ class Transform:
         """Apply transformation to points (callable interface).
         
         This method provides a convenient callable interface for applying
-        the transformation to points. Equivalent to apply_points().
+        the transformation to points. Equivalent to apply_piont().
         
         Args:
             pts: Input points with shape (N, 3) or (3,) for single point
@@ -293,11 +293,11 @@ class Transform:
             >>> import numpy as np
             >>> transform = Transform(np.eye(4))
             >>> points = [[1, 2, 3]]
-            >>> transformed = transform(points)  # Same as transform.apply_points(points)
+            >>> transformed = transform(points)  # Same as transform.apply_piont(points)
             >>> print(transformed)
             [[1. 2. 3.]]
         """
-        return self.apply_points(pts)
+        return self.apply_piont(pts)
     
     # ------------------------------------------------------------------
     # String representation

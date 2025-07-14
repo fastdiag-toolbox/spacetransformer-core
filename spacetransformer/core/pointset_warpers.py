@@ -57,7 +57,7 @@ def calc_transform(source: Space, target: Space) -> Transform:
         >>> target = Space(shape=(50, 50, 25), spacing=(2.0, 2.0, 4.0))
         >>> transform = calc_transform(source, target)
         >>> points = np.array([[0, 0, 0], [10, 10, 10]])
-        >>> transformed = transform.apply_points(points)
+        >>> transformed = transform.apply_piont(points)
     """
     mat = target.from_world_transform.matrix @ source.to_world_transform.matrix
     return Transform(mat, source=source, target=target)
@@ -122,7 +122,7 @@ def warp_point(
     assert point_set_np.ndim == 2 and point_set_np.shape[1] == 3, "point_set shape must be (N,3)"
 
     T = calc_transform(source, target)
-    warp_pts = T.apply_points(point_set_np)
+    warp_pts = T.apply_piont(point_set_np)
 
     isin = np.all((warp_pts >= 0) & (warp_pts <= np.array(target.shape)[None] - 1), axis=1)
 
@@ -185,7 +185,7 @@ def warp_vector(
 
     dtype = vec_np.dtype
     T = calc_transform(source, target)
-    warp_vec = T.apply_vectors(vec_np)
+    warp_vec = T.apply_vector(vec_np)
 
     if istorch:
         return torch.from_numpy(warp_vec).to(device=device, dtype=vector_set.dtype)
