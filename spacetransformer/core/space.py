@@ -1,6 +1,6 @@
 import json
 from dataclasses import asdict, dataclass, field
-from typing import Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 from .transform import Transform
@@ -246,7 +246,7 @@ class Space:
         order[axis1], order[axis2] = order[axis2], order[axis1]
         return self.apply_permute(order)
 
-    def apply_permute(self, axis_order: list[int]) -> "Space":
+    def apply_permute(self, axis_order: List[int]) -> "Space":
         """按给定顺序重新排列轴。axis_order 应为对 [0,1,2] 的排列。"""
         assert sorted(axis_order) == [0, 1, 2], "axis_order 必须是 [0,1,2] 的排列"
         R = self._orientation_matrix()[:, axis_order]
@@ -282,7 +282,7 @@ class Space:
             z_orientation=self.z_orientation,
         )
 
-    def apply_shape(self, shape: tuple[int, int, int]) -> "Space":
+    def apply_shape(self, shape: Tuple[int, int, int]) -> "Space":
         """仅修改 shape，不改变其他属性。"""
         return Space(
             shape=shape,
@@ -293,7 +293,7 @@ class Space:
             z_orientation=self.z_orientation,
         )
 
-    def apply_spacing(self, spacing: tuple[float, float, float]) -> "Space":
+    def apply_spacing(self, spacing: Tuple[float, float, float]) -> "Space":
         """修改 spacing，不改变 shape。"""
         return Space(
             shape=self.shape,
@@ -304,7 +304,7 @@ class Space:
             z_orientation=self.z_orientation,
         )
 
-    def apply_float_bbox(self, bbox: np.ndarray, shape: tuple[int, int, int]) -> "Space":
+    def apply_float_bbox(self, bbox: np.ndarray, shape: Tuple[int, int, int]) -> "Space":
         """浮点 bbox 裁剪并重新采样到指定 shape。
 
         参数
@@ -358,7 +358,7 @@ class Space:
 
     def apply_zoom(
         self,
-        factor: tuple[float, float, float] | list[float] | np.ndarray | float,
+        factor: Union[Tuple[float, float, float], List[float], np.ndarray, float],
         *,
         mode: str = "floor",
         align_corners: bool = True,
