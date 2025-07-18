@@ -123,3 +123,27 @@ class FormatError(SpaceTransformerError):
         >>> #            Check image orientation and spacing parameters.")
     """
     pass
+
+
+class CudaError(SpaceTransformerError):
+    """CUDA/GPU related errors.
+    
+    This exception is raised when GPU operations fail, including CUDA runtime
+    errors, memory issues, device compatibility problems, or tensor device
+    mismatches.
+    
+    Common causes include:
+    - GPU out of memory
+    - CUDA device not available
+    - Tensor device mismatches
+    - GPU kernel failures
+    - Driver compatibility issues
+    
+    Example:
+        GPU memory error:
+        
+        >>> # This would be raised internally when GPU memory is exhausted
+        >>> # CudaError("GPU out of memory during image warping. Try reducing 
+        >>> #           batch size, using smaller images, or switching to CPU processing.")
+    """
+    pass
