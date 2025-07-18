@@ -124,10 +124,10 @@ class Transform:
         """Validate transformation matrix after initialization.
         
         Raises:
-            ValueError: If matrix is not 4x4
+            ValidationError: If matrix is not 4x4
         """
-        if self.matrix.shape != (4, 4):
-            raise ValueError("matrix must be 4x4 size")
+        from .validation import validate_transform_matrix
+        self.matrix = validate_transform_matrix(self.matrix)
 
     # ------------------------------------------------------------------
     # Basic operations

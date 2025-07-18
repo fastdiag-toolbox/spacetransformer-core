@@ -93,16 +93,28 @@ class Space:
     z_orientation: Tuple[float, float, float] = field(default_factory=lambda: (0, 0, 1))
 
     def __post_init__(self):
-        """Perform type checking and conversion after initialization.
+        """Perform type checking and validation after initialization.
         
-        Converts numpy arrays to tuples for JSON serialization and initializes
-        cached transformation matrices for efficient repeated use.
+        Validates space parameters, converts numpy arrays to tuples for JSON serialization
+        and initializes cached transformation matrices for efficient repeated use.
+        
+        Raises:
+            ValidationError: If any space parameters are invalid
         """
+        from .validation import validate_shape, validate_spacing
+        
+        # Validate parameters
+        validate_shape(self.shape)
+        validate_spacing(self.spacing)
+        
+        # Further validations could be added here for orientation vectors and origin
+        
         for field_name in self.__dataclass_fields__:
             val = getattr(self, field_name)
             if isinstance(val, np.ndarray):
                 # Convert numpy arrays to tuples
                 object.__setattr__(self, field_name, tuple(val.tolist()))
+        
         # Initialize cached transforms
         object.__setattr__(self, "_to_world_transform", None)
         object.__setattr__(self, "_from_world_transform", None)

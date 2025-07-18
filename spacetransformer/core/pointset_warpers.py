@@ -90,7 +90,7 @@ def warp_point(
         - Boolean mask indicating which points are within target bounds
         
     Raises:
-        ValueError: If point dimensions are invalid
+        ValidationError: If inputs are invalid
         
     Example:
         >>> import numpy as np
@@ -105,6 +105,12 @@ def warp_point(
         >>> print(mask)
         [True True]
     """
+    from .validation import validate_pointset, validate_space
+    
+    # Validate inputs
+    source = validate_space(source, name="source")
+    target = validate_space(target, name="target")
+    
     istorch = False
     if _has_torch and isinstance(point_set, torch.Tensor):
         device = point_set.device
@@ -113,13 +119,18 @@ def warp_point(
     else:
         point_set_np = np.asarray(point_set)
 
-    # Handle single point case (3,) -> (1,3)
-    if point_set_np.ndim == 1:
-        if point_set_np.shape[0] != 3:
-            raise ValueError("Single point must be a length-3 array")
-        point_set_np = point_set_np[None, :]  # Add batch dimension
-    
-    assert point_set_np.ndim == 2 and point_set_np.shape[1] == 3, "point_set shape must be (N,3)"
+    # Validate point set
+    try:
+        if point_set_np.ndim == 1:
+            if point_set_np.shape[0] != 3:
+                raise ValueError("Single point must be a length-3 array")
+            point_set_np = point_set_np[None, :]  # Add batch dimension
+        
+        assert point_set_np.ndim == 2 and point_set_np.shape[1] == 3, "point_set shape must be (N,3)"
+    except (ValueError, AssertionError) as e:
+        # Convert to standard ValidationError
+        from .validation import validate_pointset
+        point_set_np = validate_pointset(point_set_np)
 
     T = calc_transform(source, target)
     warp_pts = T.apply_piont(point_set_np)
@@ -154,7 +165,7 @@ def warp_vector(
         Transformed vectors in target space coordinates (same type as input)
         
     Raises:
-        ValueError: If vector dimensions are invalid
+        ValidationError: If inputs are invalid
         
     Example:
         >>> import numpy as np
@@ -167,6 +178,12 @@ def warp_vector(
         [[1. 0. 0.]
          [0. 1. 0.]]
     """
+    from .validation import validate_pointset, validate_space
+    
+    # Validate inputs
+    source = validate_space(source, name="source")
+    target = validate_space(target, name="target")
+    
     istorch = False
     if _has_torch and isinstance(vector_set, torch.Tensor):
         device = vector_set.device
@@ -175,13 +192,17 @@ def warp_vector(
     else:
         vec_np = np.asarray(vector_set)
 
-    # Handle single vector case (3,) -> (1,3)
-    if vec_np.ndim == 1:
-        if vec_np.shape[0] != 3:
-            raise ValueError("Single vector must be a length-3 array")
-        vec_np = vec_np[None, :]  # Add batch dimension
-    
-    assert vec_np.ndim == 2 and vec_np.shape[1] == 3
+    # Validate vector set
+    try:
+        if vec_np.ndim == 1:
+            if vec_np.shape[0] != 3:
+                raise ValueError("Single vector must be a length-3 array")
+            vec_np = vec_np[None, :]  # Add batch dimension
+        
+        assert vec_np.ndim == 2 and vec_np.shape[1] == 3
+    except (ValueError, AssertionError) as e:
+        # Convert to standard ValidationError
+        vec_np = validate_pointset(vec_np, name="vector_set")
 
     dtype = vec_np.dtype
     T = calc_transform(source, target)
