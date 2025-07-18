@@ -37,6 +37,7 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING, Union
+from spacetransformer.core.exceptions import ValidationError, NumericalError
 
 if TYPE_CHECKING:
     # Resolve circular import for type hints
@@ -127,7 +128,9 @@ class Transform:
             ValueError: If matrix is not 4x4
         """
         if self.matrix.shape != (4, 4):
-            raise ValueError("matrix must be 4x4 size")
+            raise ValidationError("matrix must be 4x4 size")
+        if np.linalg.det(self.matrix) == 0:
+            raise NumericalError("matrix is singular")
 
     # ------------------------------------------------------------------
     # Basic operations
