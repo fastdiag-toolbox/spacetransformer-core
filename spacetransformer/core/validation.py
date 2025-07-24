@@ -61,6 +61,65 @@ def validate_point(point: Any, name: str = "point") -> np.ndarray:
         if isinstance(e, ValidationError):
             raise
         raise ValidationError(f"Could not convert {name} to a valid 3D point: {e}")
+    return point_np
+
+def validate_orientation(orientation: Any, name: str = "orientation") -> np.ndarray:
+    """Validate a single 3D point.
+    
+    Args:
+        orientation: Input orientation to validate
+        name: Parameter name for error messages
+        
+    Returns:
+        np.ndarray: Validated point as a numpy array
+        
+    Raises:
+        ValidationError: If point is invalid
+        
+    Example:
+        >>> validate_orientation([1, 2, 3])
+        array([1., 2., 3.])
+        >>> validate_orientation([1, 2])  # Will raise ValidationError
+    """
+    orientation_np = validate_point(orientation, name=name)
+    if not np.allclose(np.linalg.norm(orientation_np), 1, atol=1e-6):
+        raise ValidationError(f"{name} must be a unit vector")
+    return orientation_np
+
+
+def validate_orthonormal_basis(
+    x_orientation: np.ndarray,
+    y_orientation: np.ndarray,
+    z_orientation: np.ndarray,
+    tol: float = 1e-6,
+) -> None:
+    """Validate that three orientation vectors form an orthonormal basis.
+    
+    This function checks if the given vectors form a proper orthonormal right-handed basis
+    by examining properties of the rotation matrix they form.
+    
+    Args:
+        x_orientation: X-axis orientation vector (unit vector)
+        y_orientation: Y-axis orientation vector (unit vector)
+        z_orientation: Z-axis orientation vector (unit vector)
+        tol: Numerical tolerance for checks
+        
+    Raises:
+        ValidationError: If vectors don't form an orthonormal right-handed basis
+    """
+    # Form the rotation matrix R
+    R = np.column_stack([x_orientation, y_orientation, z_orientation])
+    
+    # Check orthonormality using R.T @ R = I (identity matrix)
+    # This is a single operation that checks all orthogonality conditions
+    RTR = R.T @ R
+    identity = np.eye(3)
+    if not np.allclose(RTR, identity, atol=tol):
+        raise ValidationError(
+            f"Orientation vectors are not orthonormal. "
+            f"R.T @ R should be the identity matrix, but differs by "
+            f"{np.max(np.abs(RTR - identity)):.6f}"
+        )
 
 
 def validate_pointset(
@@ -213,6 +272,51 @@ def validate_space(space: Any, name: str = "space") -> "Space":
     
     # The Space class already validates its own parameters on initialization
     return space
+
+
+def validate_bbox(bbox: Any, check_int: bool = False) -> np.ndarray:
+    """Validate a bounding box for space operations.
+    
+    Args:
+        bbox: Input bounding box to validate, should have shape (3, 2)
+        check_int: Whether to require integer values in the bbox
+        name: Parameter name for error messages
+        
+    Returns:
+        np.ndarray: Validated bbox as a numpy array with shape (3, 2)
+        
+    Raises:
+        ValidationError: If bbox is invalid
+        
+    Example:
+        >>> validate_bbox([[10, 90], [20, 80], [5, 45]])
+        array([[10, 90],
+               [20, 80],
+               [5, 45]])
+        >>> validate_bbox([[10.5, 90.2], [20.3, 80.1], [5.0, 45.9]], check_int=False)
+        array([[10.5, 90.2],
+               [20.3, 80.1],
+               [5. , 45.9]])
+    """
+    # Convert to numpy array
+    try:
+        bbox_np = np.asarray(bbox)
+    except Exception as e:
+        raise ValidationError(f"bbox must be convertible to a numpy array: {e}")
+        
+    # Check shape
+    if bbox_np.shape != (3, 2):
+        raise ValidationError(f"bbox must be a 3×2 array, got shape {bbox_np.shape}")
+    
+    # Check integer values if required
+    if check_int and not np.all(bbox_np % 1 == 0):
+        raise ValidationError(f"bbox must contain only integer values")
+    
+    # Check bounds
+    if not np.all(bbox_np[:, 1] > bbox_np[:, 0]):
+        raise ValidationError(f"bbox upper bounds must be greater than lower bounds")
+    
+    return bbox_np
 
 
 def validate_image_data(

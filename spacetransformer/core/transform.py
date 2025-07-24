@@ -21,7 +21,7 @@ Example:
     >>> matrix = np.eye(4)
     >>> transform = Transform(matrix)
     >>> points = [[0, 0, 0], [1, 1, 1]]
-    >>> transformed = transform.apply_piont(points)
+    >>> transformed = transform.apply_point(points)
     >>> print(transformed)
     [[0. 0. 0.]
      [1. 1. 1.]]
@@ -111,7 +111,7 @@ class Transform:
         ...                    [0, 0, 0, 1]])
         >>> transform = Transform(matrix)
         >>> point = [0, 0, 0]
-        >>> transformed = transform.apply_piont(point)
+        >>> transformed = transform.apply_point(point)
         >>> print(transformed)
         [[10. 20. 30.]]
     """
@@ -220,7 +220,7 @@ class Transform:
     # ------------------------------------------------------------------
     # Apply to points / vectors
     # ------------------------------------------------------------------
-    def apply_piont(self, pts: ArrayLike) -> np.ndarray:
+    def apply_point(self, pts: ArrayLike) -> np.ndarray:
         """Apply transformation to a set of points.
         
         This method transforms 3D points using the 4x4 transformation matrix.
@@ -241,7 +241,7 @@ class Transform:
             ...                    [0, 0, 0, 1]])
             >>> transform = Transform(matrix)
             >>> points = [[0, 0, 0], [1, 1, 1]]
-            >>> transformed = transform.apply_piont(points)
+            >>> transformed = transform.apply_point(points)
             >>> print(transformed)
             [[10. 20. 30.]
              [11. 21. 31.]]
@@ -284,7 +284,7 @@ class Transform:
         """Apply transformation to points (callable interface).
         
         This method provides a convenient callable interface for applying
-        the transformation to points. Equivalent to apply_piont().
+        the transformation to points. Equivalent to apply_point().
         
         Args:
             pts: Input points with shape (N, 3) or (3,) for single point
@@ -296,11 +296,11 @@ class Transform:
             >>> import numpy as np
             >>> transform = Transform(np.eye(4))
             >>> points = [[1, 2, 3]]
-            >>> transformed = transform(points)  # Same as transform.apply_piont(points)
+            >>> transformed = transform(points)  # Same as transform.apply_point(points)
             >>> print(transformed)
             [[1. 2. 3.]]
         """
-        return self.apply_piont(pts)
+        return self.apply_point(pts)
     
     # ------------------------------------------------------------------
     # String representation

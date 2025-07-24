@@ -57,7 +57,7 @@ def calc_transform(source: Space, target: Space) -> Transform:
         >>> target = Space(shape=(50, 50, 25), spacing=(2.0, 2.0, 4.0))
         >>> transform = calc_transform(source, target)
         >>> points = np.array([[0, 0, 0], [10, 10, 10]])
-        >>> transformed = transform.apply_piont(points)
+        >>> transformed = transform.apply_point(points)
     """
     mat = target.from_world_transform.matrix @ source.to_world_transform.matrix
     return Transform(mat, source=source, target=target)
@@ -133,7 +133,7 @@ def warp_point(
         point_set_np = validate_pointset(point_set_np)
 
     T = calc_transform(source, target)
-    warp_pts = T.apply_piont(point_set_np)
+    warp_pts = T.apply_point(point_set_np)
 
     isin = np.all((warp_pts >= 0) & (warp_pts <= np.array(target.shape)[None] - 1), axis=1)
 

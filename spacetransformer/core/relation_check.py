@@ -173,7 +173,7 @@ def _check_isin(source: Space, target: Space) -> bool:
         [0, s[1], s[2]],
         [s[0], s[1], s[2]],
     ])
-    eight_world = source.to_world_transform.apply_piont(eight)
+    eight_world = source.to_world_transform.apply_point(eight)
     isin = target.contain_pointset_world(eight_world)
     return bool(np.all(isin))
 

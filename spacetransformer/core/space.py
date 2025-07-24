@@ -31,7 +31,7 @@ Example:
     ... )
     >>> transform = space.to_world_transform
     >>> points = [[0, 0, 0], [10, 10, 10]]
-    >>> world_points = transform.apply_piont(points)
+    >>> world_points = transform.apply_point(points)
 """
 
 import json
@@ -81,8 +81,8 @@ class Space:
         Transform between index and world coordinates:
         
         >>> index_points = [[0, 0, 0], [10, 10, 10]]
-        >>> world_points = space.to_world_transform.apply_piont(index_points)
-        >>> back_to_index = space.from_world_transform.apply_piont(world_points)
+        >>> world_points = space.to_world_transform.apply_point(index_points)
+        >>> back_to_index = space.from_world_transform.apply_point(world_points)
     """
 
     shape: Tuple[int, int, int]
@@ -101,23 +101,39 @@ class Space:
         Raises:
             ValidationError: If any space parameters are invalid
         """
-        from .validation import validate_shape, validate_spacing
+        from .validation import validate_shape, validate_spacing, validate_point, validate_orientation, validate_orthonormal_basis
         
         # Validate parameters
         validate_shape(self.shape)
         validate_spacing(self.spacing)
+        validate_point(self.origin, name="origin")
         
-        # Further validations could be added here for orientation vectors and origin
+        # Validate orientation vectors
+        validate_orientation(self.x_orientation, name="x_orientation")
+        validate_orientation(self.y_orientation, name="y_orientation")
+        validate_orientation(self.z_orientation, name="z_orientation")
+        
+        # Validate that orientation vectors form an orthonormal right-handed basis
+        validate_orthonormal_basis(
+            np.array(self.x_orientation), 
+            np.array(self.y_orientation), 
+            np.array(self.z_orientation)
+        )
         
         for field_name in self.__dataclass_fields__:
             val = getattr(self, field_name)
             if isinstance(val, np.ndarray):
                 # Convert numpy arrays to tuples
                 object.__setattr__(self, field_name, tuple(val.tolist()))
-        
-        # Initialize cached transforms
+            elif isinstance(val, list):
+                # Convert lists to tuples for immutability and type consistency
+                object.__setattr__(self, field_name, tuple(val))
+
+        # Initialize cached values for repeated calculations
         object.__setattr__(self, "_to_world_transform", None)
         object.__setattr__(self, "_from_world_transform", None)
+        object.__setattr__(self, "_orientation_matrix_cache", None)
+        object.__setattr__(self, "_scaled_orientation_matrix_cache", None)
 
     def to_json(self) -> str:
         """Serialize the Space object to a JSON string.
@@ -352,24 +368,55 @@ class Space:
         """
         return self.x_orientation + self.y_orientation
 
-    def _orientation_matrix(self) -> np.ndarray:
+    @property
+    def orientation_matrix(self) -> np.ndarray:
         """Return the 3x3 orientation matrix with direction cosines as columns.
         
-        This internal method constructs the orientation matrix used throughout
-        the class for coordinate transformations.
+        This property constructs the orientation matrix used throughout
+        the class for coordinate transformations. The result is cached for
+        efficient repeated access.
         
         Returns:
             np.ndarray: 3x3 matrix with orientation vectors as columns
             
         Example:
             >>> space = Space(shape=(100, 100, 50))
-            >>> R = space._orientation_matrix()
+            >>> R = space.orientation_matrix
             >>> print(R.shape)
             (3, 3)
             >>> print(np.allclose(R, np.eye(3)))  # Identity for default orientation
             True
         """
-        return np.column_stack((self.x_orientation, self.y_orientation, self.z_orientation))
+        if getattr(self, "_orientation_matrix_cache") is None:
+            # Cache the orientation matrix for repeated use
+            matrix = np.column_stack((self.x_orientation, self.y_orientation, self.z_orientation))
+            object.__setattr__(self, "_orientation_matrix_cache", matrix)
+        return self._orientation_matrix_cache
+        
+    @property
+    def scaled_orientation_matrix(self) -> np.ndarray:
+        """Return the 3x3 orientation matrix scaled by voxel spacing.
+        
+        This property combines the orientation matrix with voxel spacing to create
+        a transformation matrix that maps from index space to physical space (excluding translation).
+        The result is cached for efficient repeated access.
+        
+        Returns:
+            np.ndarray: 3x3 matrix with scaled orientation vectors as columns
+            
+        Example:
+            >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 2.0, 3.0))
+            >>> RS = space.scaled_orientation_matrix
+            >>> print(RS.shape)
+            (3, 3)
+            >>> print(np.diag(RS).tolist())  # Should be proportional to spacing
+            [1.0, 2.0, 3.0]
+        """
+        if getattr(self, "_scaled_orientation_matrix_cache") is None:
+            # Cache the scaled orientation matrix for repeated use
+            matrix = self.orientation_matrix @ np.diag(self.spacing)
+            object.__setattr__(self, "_scaled_orientation_matrix_cache", matrix)
+        return self._scaled_orientation_matrix_cache
 
     # ------------------------------------------------------------------
     # World ↔ Index transformations
@@ -388,14 +435,13 @@ class Space:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
             >>> transform = space.to_world_transform
             >>> index_points = [[0, 0, 0], [10, 10, 10]]
-            >>> world_points = transform.apply_piont(index_points)
+            >>> world_points = transform.apply_point(index_points)
             >>> print(world_points[1])  # Point at index (10, 10, 10)
             [10. 10. 20.]
         """
         if getattr(self, "_to_world_transform") is None:
-            RS = self._orientation_matrix() @ np.diag(self.spacing)
             mat = np.eye(4, dtype=float)
-            mat[:3, :3] = RS
+            mat[:3, :3] = self.scaled_orientation_matrix
             mat[:3, 3] = self.origin
             tw = Transform(mat, source=self, target=None)
             object.__setattr__(self, "_to_world_transform", tw)
@@ -415,7 +461,7 @@ class Space:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
             >>> transform = space.from_world_transform
             >>> world_points = [[10.0, 10.0, 20.0]]
-            >>> index_points = transform.apply_piont(world_points)
+            >>> index_points = transform.apply_point(world_points)
             >>> print(index_points[0])  # Should be [10, 10, 10]
             [10. 10. 10.]
         """
@@ -451,7 +497,7 @@ class Space:
         """
         # (shape-1) per-axis distance vector
         extent = (np.array(self.shape) - 1)
-        return self._orientation_matrix() @ (extent * np.array(self.spacing))
+        return self.scaled_orientation_matrix @ extent
 
     @property
     def end(self) -> np.ndarray:
@@ -510,7 +556,7 @@ class Space:
         new_origin = list(self.origin)
         new_origin[axis] = self.end[axis]
         # Flip orientation vector
-        R = self._orientation_matrix().copy()
+        R = self.orientation_matrix.copy()
         R[:, axis] *= -1
         # Split orientation vectors
         x_o, y_o, z_o = (R[:, 0], R[:, 1], R[:, 2])
@@ -577,7 +623,7 @@ class Space:
             (3.0, 2.0, 1.0)
         """
         assert sorted(axis_order) == [0, 1, 2], "axis_order must be a permutation of [0, 1, 2]"
-        R = self._orientation_matrix()[:, axis_order]
+        R = self.orientation_matrix[:, axis_order]
         new_shape = tuple(np.array(self.shape)[axis_order])
         new_spacing = tuple(np.array(self.spacing)[axis_order])
         x_o, y_o, z_o = (R[:, 0], R[:, 1], R[:, 2])
@@ -605,7 +651,7 @@ class Space:
             Space: New Space instance representing the cropped region
             
         Raises:
-            AssertionError: If bbox shape is not (3, 2) or bounds are invalid
+            ValidationError: If bbox shape is not (3, 2) or bounds are invalid
             
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
@@ -616,11 +662,12 @@ class Space:
             >>> print(cropped.origin)
             (10.0, 20.0, 10.0)
         """
-        bbox = np.asarray(bbox)
-        assert bbox.shape == (3, 2), "bbox must be a 3×2 array"
-        assert np.all(bbox[:, 1] > bbox[:, 0]), "bbox upper bounds must be greater than lower bounds"
+        from .validation import validate_bbox
+        
+        # Validate bbox - must contain integers for apply_bbox
+        bbox = validate_bbox(bbox, check_int=True)
         # shift world origin
-        shift = self._orientation_matrix() @ (bbox[:, 0] * np.array(self.spacing))
+        shift = self.scaled_orientation_matrix @ bbox[:, 0]
         new_origin = tuple(np.array(self.origin) + shift)
         new_shape = bbox[:, 1] - bbox[:, 0]
         if include_end:
@@ -634,36 +681,96 @@ class Space:
             z_orientation=self.z_orientation,
         )
 
-    def apply_shape(self, shape: Tuple[int, int, int]) -> "Space":
-        """Create a new space with modified shape only.
-        
-        This method creates a new space with the specified shape while
-        preserving all other attributes (origin, spacing, orientation).
+    def apply_shape(self, shape: Tuple[int, int, int], align_corners: bool = True) -> "Space":
+        """Create a new space with modified shape, adjusting spacing and possibly origin.
+    
+        This method creates a new space with the specified shape, and recalculates
+        spacing to maintain the same physical span. Origin may also be adjusted 
+        depending on align_corners setting.
         
         Args:
             shape: New image dimensions (height, width, depth) in voxels
+            align_corners: If True, maintain alignment at corner pixels,
+                        similar to PyTorch's grid_sample align_corners parameter
             
         Returns:
-            Space: New Space instance with the specified shape
+            Space: New Space instance with updated shape and spacing
             
+        Raises:
+            ValidationError: If shape dimensions are invalid
+            
+        Notes:
+            When align_corners=True:
+                - For dimensions where either old or new shape is 1, 
+                alignment is handled as if align_corners=False
+                - For other dimensions, the corners of the image are aligned
+            
+            When align_corners=False:
+                - The centers of the corner pixels are aligned
+                - This changes both spacing and origin
+        
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
-            >>> resized = space.apply_shape((200, 200, 100))
+            >>> resized = space.apply_shape((200, 200, 100), align_corners=True)
             >>> print(resized.shape)
             (200, 200, 100)
-            >>> print(resized.spacing)  # Unchanged
-            (1.0, 1.0, 2.0)
+            >>> print(resized.spacing)  # Adjusted to maintain physical span
+            (0.5, 0.5, 1.0)
         """
+        from .validation import ValidationError, validate_shape
+        
+        # Validate the shape parameter
+        validate_shape(shape)
+        
+        # Convert to numpy array after validation
+        new_shape = np.asarray(shape, dtype=int)
+        
+        # Set alignment flags per axis
+        if align_corners:
+            align_flag = np.ones(3, dtype=bool)
+            for i in range(3):
+                if new_shape[i] == 1 or self.shape[i] == 1:
+                    align_flag[i] = False
+        else:
+            align_flag = np.zeros(3, dtype=bool)
+
+        # Calculate new spacing for both modes
+        tmp = new_shape.astype(float) - 1
+        # Avoid division by zero
+        tmp[tmp == 0] = 1e-3
+        
+        # Aligned corners: distribute physical span across new shape-1 range
+        new_spacing_align = np.array(self.spacing) * (np.array(self.shape) - 1) / tmp
+        
+        # Non-aligned: distribute physical span across full shape range
+        new_spacing_noalign = np.array(self.spacing) * np.array(self.shape) / new_shape.astype(float)
+        
+        # Default new origin (aligned case)
+        new_origin_align = np.array(self.origin)
+        
+        # Calculate new origin for non-aligned case
+        R = self.orientation_matrix
+        spacing_diff = np.array(self.spacing) - new_spacing_noalign
+        origin_shift = np.sum(0.5 * R * spacing_diff.reshape(-1, 1), axis=0)
+        new_origin_noalign = np.array(self.origin) - origin_shift
+        
+        # Apply the appropriate values based on alignment flags
+        new_spacing = new_spacing_noalign.copy()
+        new_spacing[align_flag] = new_spacing_align[align_flag]
+        
+        new_origin = new_origin_noalign.copy()
+        new_origin[align_flag] = new_origin_align[align_flag]
+
         return Space(
-            shape=shape,
-            origin=self.origin,
-            spacing=self.spacing,
+            shape=tuple(new_shape.tolist()),
+            origin=tuple(new_origin.tolist()),
+            spacing=tuple(new_spacing.tolist()),
             x_orientation=self.x_orientation,
             y_orientation=self.y_orientation,
             z_orientation=self.z_orientation,
         )
 
-    def apply_spacing(self, spacing: Tuple[float, float, float]) -> "Space":
+    def apply_spacing(self, spacing: Tuple[float, float, float], recompute_spacing: bool = True) -> "Space":
         """Create a new space with modified spacing only.
         
         This method creates a new space with the specified voxel spacing while
@@ -671,9 +778,13 @@ class Space:
         
         Args:
             spacing: New voxel spacing (x, y, z) in mm
+            recompute_spacing: Whether to recompute the spacing or not.
             
         Returns:
             Space: New Space instance with the specified spacing
+            
+        Raises:
+            ValidationError: If spacing values are invalid
             
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
@@ -683,14 +794,28 @@ class Space:
             >>> print(resampled.shape)  # Unchanged
             (100, 100, 50)
         """
-        return Space(
-            shape=self.shape,
-            origin=self.origin,
-            spacing=spacing,
-            x_orientation=self.x_orientation,
-            y_orientation=self.y_orientation,
-            z_orientation=self.z_orientation,
-        )
+        from .validation import validate_spacing
+        # Validate spacing parameter
+        validate_spacing(spacing)
+        
+        R = self.orientation_matrix
+        M = R @ np.diag(spacing)
+        new_shape = np.round(np.linalg.solve(M, self.physical_span)).astype(int) + 1
+        if not recompute_spacing:
+            return Space(origin=self.origin, 
+                         x_orientation=self.x_orientation, 
+                         y_orientation=self.y_orientation, 
+                         z_orientation=self.z_orientation, 
+                         spacing=spacing, 
+                         shape=new_shape)
+        else:
+            new_spacing = np.linalg.solve(R * (new_shape - 1), self.physical_span)
+            return Space(origin=self.origin, 
+                         x_orientation=self.x_orientation, 
+                         y_orientation=self.y_orientation, 
+                         z_orientation=self.z_orientation, 
+                         spacing=new_spacing, 
+                         shape=new_shape)
 
     def apply_float_bbox(self, bbox: np.ndarray, shape: Tuple[int, int, int]) -> "Space":
         """Crop with floating-point bounding box and resample to specified shape.
@@ -714,7 +839,7 @@ class Space:
                   defined by the bounding box
             
         Raises:
-            AssertionError: If bbox shape is not (3, 2) or bounds are invalid
+            ValidationError: If bbox or shape parameters are invalid
             
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
@@ -725,19 +850,19 @@ class Space:
             >>> print(resampled.spacing)
             (1.0, 1.0, 1.0)
         """
-        # Input validation
-        bbox = np.asarray(bbox, dtype=float)
-        assert bbox.shape == (3, 2), "bbox must be a 3×2 array"
-        assert np.all(bbox[:, 1] >= bbox[:, 0]), "bbox[:,1] must be >= bbox[:,0]"
+        from .validation import validate_bbox, validate_shape
+        
+        # Validate bbox - float values are allowed for apply_float_bbox
+        bbox = validate_bbox(bbox, check_int=False)
 
+        # Input validation for shape
+        validate_shape(shape)
         new_shape = np.asarray(shape, dtype=int)
-        assert new_shape.shape == (3,), "shape must have length 3"
-        assert np.all(new_shape > 0), "shape dimensions must be > 0"
 
-        R = self._orientation_matrix()  # 3×3 column vectors
+        R = self.orientation_matrix  # 3×3 column vectors
 
         # 1) New origin
-        shift = R @ (bbox[:, 0] * np.array(self.spacing))  # world coordinate shift
+        shift = self.scaled_orientation_matrix @ bbox[:, 0]  # world coordinate shift
         new_origin = np.array(self.origin) + shift
 
         # 2) New spacing
@@ -753,7 +878,7 @@ class Space:
                 np.array(self.spacing) * np.array(self.shape) / new_shape
             )[singular_axis]
             # Adjust origin to maintain physical center consistency
-            shift2 = R @ (np.array(self.spacing) * (bbox[:, 1] - bbox[:, 0]))
+            shift2 = self.scaled_orientation_matrix @ (bbox[:, 1] - bbox[:, 0])
             new_origin[singular_axis] = (new_origin + shift2 / 2)[singular_axis]
 
         return Space(
@@ -768,7 +893,6 @@ class Space:
     def apply_zoom(
         self,
         factor: Union[Tuple[float, float, float], List[float], np.ndarray, float],
-        *,
         mode: str = "floor",
         align_corners: bool = True,
     ) -> "Space":
@@ -786,6 +910,9 @@ class Space:
         Returns:
             Space: New Space instance with scaled shape
             
+        Raises:
+            ValidationError: If factor or mode parameters are invalid
+            
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
             >>> zoomed = space.apply_zoom(0.5, mode="round")
@@ -794,11 +921,34 @@ class Space:
             >>> print(zoomed.spacing)  # Unchanged
             (1.0, 1.0, 2.0)
         """
-        assert mode in {"floor", "round", "ceil"}, "mode must be floor/round/ceil"
-        if np.isscalar(factor):
-            factor = (float(factor),) * 3
-        factor_arr = np.asarray(factor, dtype=float)
-        assert factor_arr.shape == (3,), "factor must be length 3 or scalar"
+        from .validation import ValidationError
+        
+        # Validate mode parameter
+        if mode not in {"floor", "round", "ceil"}:
+            raise ValidationError(
+                f"mode must be one of 'floor', 'round', 'ceil', got '{mode}'"
+            )
+        
+        # Convert and validate factor
+        try:
+            if np.isscalar(factor):
+                factor = (float(factor),) * 3
+            factor_arr = np.asarray(factor, dtype=float)
+            
+            if factor_arr.shape != (3,):
+                raise ValidationError(
+                    f"factor must be a scalar or have length 3, got shape {factor_arr.shape}"
+                )
+                
+            # Additional validation for non-positive factors
+            if np.any(factor_arr <= 0):
+                raise ValidationError(
+                    f"factor values must be positive, got {factor_arr}"
+                )
+        except Exception as e:
+            if isinstance(e, ValidationError):
+                raise
+            raise ValidationError(f"Invalid factor parameter: {e}")
 
         if mode == "floor":
             new_shape = np.floor(np.array(self.shape) * factor_arr).astype(int)
@@ -810,7 +960,7 @@ class Space:
         # Ensure minimum size of 1
         new_shape[new_shape < 1] = 1
 
-        return self.apply_shape(tuple(new_shape.tolist()))
+        return self.apply_shape(tuple(new_shape.tolist()), align_corners=align_corners)
 
     # ------------------------------------------------------------------
     # Rotation methods
@@ -887,7 +1037,7 @@ class Space:
             Space: New Space instance with rotated orientation
             
         Raises:
-            AssertionError: If parameters are invalid
+            ValidationError: If rotation parameters are invalid
             
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
@@ -897,13 +1047,29 @@ class Space:
             >>> print(rotated.y_orientation)
             (-1.0, 0.0, 0.0)
         """
-        assert axis in (0, 1, 2), "axis must be 0/1/2"
-        assert unit in ("radian", "degree"), "unit must be radian/degree"
-        assert center in ("center", "origin"), "center must be center/origin"
+        from .validation import ValidationError
+        
+        # Validate rotation axis
+        if axis not in (0, 1, 2):
+            raise ValidationError(f"axis must be 0, 1, or 2, got {axis}")
+            
+        # Validate angle unit
+        if unit not in ("radian", "degree"):
+            raise ValidationError(f"unit must be 'radian' or 'degree', got '{unit}'")
+            
+        # Validate rotation center
+        if center not in ("center", "origin"):
+            raise ValidationError(f"center must be 'center' or 'origin', got '{center}'")
+            
+        # Validate angle is numeric
+        try:
+            angle = float(angle)
+        except (TypeError, ValueError):
+            raise ValidationError(f"angle must be a number, got {type(angle).__name__}")
 
         angle_rad = float(angle) if unit == "radian" else float(angle) / 180.0 * np.pi
 
-        R_old = self._orientation_matrix()  # 3×3
+        R_old = self.orientation_matrix  # 3×3
         rotm = self._axis_angle_rotation(axis, angle_rad)  # 3×3
         R_new = R_old @ rotm  # right multiply column vectors
 
@@ -954,6 +1120,34 @@ class Space:
             y_orientation=self.y_orientation,
             z_orientation=self.z_orientation,
         )
+        
+    def __repr__(self) -> str:
+        """Return a concise string representation of the Space object.
+        
+        Formats the output with consistent tuple representation and limited
+        decimal places for better readability.
+        
+        Returns:
+            str: Concise string representation of the Space object
+        """
+        return (
+            f"Space(\n"
+            f"  shape={self.shape},\n"
+            f"  origin=({', '.join(f'{x:.2f}' for x in self.origin)}),\n"
+            f"  spacing=({', '.join(f'{x:.2f}' for x in self.spacing)}),\n"
+            f"  x_orientation=({', '.join(f'{x:.2f}' for x in self.x_orientation)}),\n"
+            f"  y_orientation=({', '.join(f'{x:.2f}' for x in self.y_orientation)}),\n"
+            f"  z_orientation=({', '.join(f'{x:.2f}' for x in self.z_orientation)})\n"
+            f")"
+        )
+        
+    def __str__(self) -> str:
+        """Return a concise string representation of the Space object.
+        
+        Returns:
+            str: Same as __repr__ for consistency
+        """
+        return self.__repr__()
 
     def contain_pointset_ind(self, pointset_ind: np.ndarray) -> np.ndarray:
         """Check if index coordinates are within the space bounds.
@@ -974,8 +1168,8 @@ class Space:
             >>> print(inside)
             [True False True]
         """
-        pts = np.asarray(pointset_ind)
-        assert pts.ndim == 2 and pts.shape[1] == 3
+        from .validation import validate_pointset
+        pts = validate_pointset(pointset_ind, name="pointset_ind")
         return np.all((pts >= 0) & (pts <= np.array(self.shape)[None] - 1), axis=1)
 
     def contain_pointset_world(self, pointset_world: np.ndarray) -> np.ndarray:
@@ -989,7 +1183,7 @@ class Space:
             
         Returns:
             np.ndarray: Boolean array of shape (N,) indicating which points are inside
-            
+        
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
             >>> world_points = np.array([[10.0, 20.0, 30.0], [150.0, 50.0, 25.0]])
@@ -997,7 +1191,9 @@ class Space:
             >>> print(inside)
             [True False]
         """
-        pts_idx = self.from_world_transform.apply_piont(pointset_world)
+        from .validation import validate_pointset
+        points = validate_pointset(pointset_world, name="pointset_world")
+        pts_idx = self.from_world_transform.apply_point(points)
         return self.contain_pointset_ind(pts_idx)
 
 

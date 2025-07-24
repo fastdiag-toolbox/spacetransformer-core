@@ -35,8 +35,8 @@ Describe complex transformations explicitly:
 # Chain operations elegantly
 transformed_space = (space
     .apply_flip(axis=2)
-    .apply_resize((256, 256, 50))
-    .apply_crop(bbox))
+    .apply_shape((256, 256, 50))
+    .apply_bbox(bbox))
 ```
 
 ### 3. Transparent Matrix Interpretation
@@ -50,11 +50,11 @@ No more guessing what a 4x4 affine matrix means - direction vectors are explicit
 # crop -> resize -> segmentation -> resize back -> pad back
 
 # SpaceTransformer approach: fully reversible by design
-target_space = original_space.apply_crop(bbox).apply_resize(target_size)
+target_space = original_space.apply_bbox(bbox).apply_shape(target_size)
 warped_img = warp_image(original_img, 
                         original_space, 
                         target_space, 
-                        mode='linear', 
+                        mode='trilinear', 
                         pad_value=-1000)
 # ... process in target_space ...
 segment_result = segmodel(warped_img) # hxwxl, int
@@ -74,7 +74,7 @@ world_keypoint_result = target_space.to_world_transform(keypoint_result) # nx3, 
 ### 2. Abstract-Then-Execute Pattern
 ```python
 # Plan transformations (fast, no actual image processing)
-target_space = source_space.apply_flip(0).apply_rotate(1, 30).apply_crop(bbox).apply_resize((256, 256, 128))
+target_space = source_space.apply_flip(0).apply_rotate(1, 30, unit="degree").apply_bbox(bbox).apply_shape((256, 256, 128))
 
 # Execute once with optimal path (GPU-accelerated)
 result = warp_image(image, source_space, target_space, cuda_device="cuda:0")
@@ -105,7 +105,7 @@ space = Space(
 )
 
 # Define target transformation
-target_space = space.apply_flip(axis=2).apply_resize((256, 256, 50))
+target_space = space.apply_flip(axis=2).apply_shape((256, 256, 50))
 
 # Apply to image (GPU-accelerated)
 transformed_image = warp_image(

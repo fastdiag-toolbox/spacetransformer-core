@@ -40,8 +40,8 @@ class TestTransform(unittest.TestCase):
         t2 = Transform(mat2)
         t3 = t2 @ t1  # 先 t1 后 t2
         pts = np.random.rand(5, 3)
-        out1 = t3.apply_piont(pts)
-        out2 = t2.apply_piont(t1.apply_piont(pts))
+        out1 = t3.apply_point(pts)
+        out2 = t2.apply_point(t1.apply_point(pts))
         self.assertTrue(np.allclose(out1, out2, atol=1e-6))
         # compose 同等语义
         t3b = t1.compose(t2)  # 先 t1 后 t2
@@ -56,19 +56,19 @@ class TestTransform(unittest.TestCase):
         expected = (mat[:3, :3] @ vecs.T).T
         self.assertTrue(np.allclose(out, expected, atol=1e-6))
 
-    def test_apply_piont_list_tuple_input(self):
-        """测试 apply_piont 对 list 和 tuple 输入的处理"""
+    def test_apply_point_list_tuple_input(self):
+        """测试 apply_point 对 list 和 tuple 输入的处理"""
         mat = self._random_matrix()
         T = Transform(mat)
         
         # 测试单个点 (list)
         point_list = [1.0, 2.0, 3.0]
-        result_list = T.apply_piont(point_list)
+        result_list = T.apply_point(point_list)
         self.assertEqual(result_list.shape, (1, 3))
         
         # 测试单个点 (tuple)
         point_tuple = (1.0, 2.0, 3.0)
-        result_tuple = T.apply_piont(point_tuple)
+        result_tuple = T.apply_point(point_tuple)
         self.assertEqual(result_tuple.shape, (1, 3))
         
         # 验证 list 和 tuple 结果一致
@@ -76,17 +76,17 @@ class TestTransform(unittest.TestCase):
         
         # 测试与 numpy 数组结果一致
         point_array = np.array([1.0, 2.0, 3.0])
-        result_array = T.apply_piont(point_array)
+        result_array = T.apply_point(point_array)
         self.assertTrue(np.allclose(result_list, result_array, atol=1e-6))
         
         # 测试多个点 (list of lists)
         points_list = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
-        result_multi = T.apply_piont(points_list)
+        result_multi = T.apply_point(points_list)
         self.assertEqual(result_multi.shape, (2, 3))
         
         # 验证与 numpy 数组结果一致
         points_array = np.array(points_list)
-        result_multi_array = T.apply_piont(points_array)
+        result_multi_array = T.apply_point(points_array)
         self.assertTrue(np.allclose(result_multi, result_multi_array, atol=1e-6))
 
     def test_apply_vector_list_tuple_input(self):
@@ -127,10 +127,10 @@ class TestTransform(unittest.TestCase):
         mat = self._random_matrix()
         T = Transform(mat)
         
-        # 测试 __call__ 方法与 apply_piont 的一致性
+        # 测试 __call__ 方法与 apply_point 的一致性
         point_list = [1.0, 2.0, 3.0]
         result_call = T(point_list)
-        result_apply = T.apply_piont(point_list)
+        result_apply = T.apply_point(point_list)
         self.assertTrue(np.allclose(result_call, result_apply, atol=1e-6))
 
 

@@ -19,15 +19,15 @@ from spacetransformer.core.relation_check import (
 
 class TestRelationCheck(unittest.TestCase):
     def setUp(self):
-        base = np.array([[0.8, 0.6, 0.0], [-0.6, 0.8, 0.6], [0.0, 0.0, 0.8]])
+        # base = np.array([[0.8, 0.6, 0.0], [-0.6, 0.8, 0.6], [0.0, 0.0, 0.8]])
         self.shape = (8, 9, 10)
         self.sp1 = Space(
             shape=self.shape,
             origin=(0.1, 0.2, 0.3),
             spacing=(0.9, 0.8, 1.0),
-            x_orientation=tuple(base[:, 0]),
-            y_orientation=tuple(base[:, 1]),
-            z_orientation=tuple(base[:, 2]),
+            x_orientation=(0.8, -0.6, 0.0),
+            y_orientation=(0.6, 0.8, 0.0),
+            z_orientation=(0.0, 0.0, 1.0),
         )
 
     def test_flip_permute(self):

@@ -30,8 +30,8 @@ class TestSpace(unittest.TestCase):
 
     def test_world_index_roundtrip(self):
         idx = np.random.rand(20, 3) * (np.array(self.sp.shape) - 1)
-        world = self.sp.to_world_transform.apply_piont(idx)
-        idx_back = self.sp.from_world_transform.apply_piont(world)
+        world = self.sp.to_world_transform.apply_point(idx)
+        idx_back = self.sp.from_world_transform.apply_point(world)
         self.assertTrue(np.allclose(idx, idx_back, atol=1e-5))
 
     def test_physical_span_end(self):
@@ -106,10 +106,10 @@ class TestSpace(unittest.TestCase):
         sp2 = self.sp.apply_zoom(factor, mode="round")
         expected_shape = tuple(np.round(np.array(self.sp.shape) * np.array(factor)).astype(int).tolist())
         self.assertEqual(sp2.shape, expected_shape)
-        # spacing 不变
-        self.assertEqual(sp2.spacing, self.sp.spacing)
+        # end 不变
+        self.assertTrue(np.allclose(sp2.end, self.sp.end, atol=1e-6))
         # origin 不变
-        self.assertEqual(sp2.origin, self.sp.origin)
+        self.assertTrue(np.allclose(sp2.origin, self.sp.origin, atol=1e-6))
 
     def test_apply_rotate(self):
         axis = 2  # z 轴
