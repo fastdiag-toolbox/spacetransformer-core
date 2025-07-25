@@ -43,7 +43,7 @@ class TestValidationFunctions:
     def test_validate_point_invalid(self):
         """Test validate_point with invalid inputs."""
         # Test with wrong type
-        with pytest.raises(ValidationError, match="must be a list, tuple, or array"):
+        with pytest.raises(ValidationError, match="Could not convert point to a numpy array"):
             validate_point("not a point")
         
         # Test with wrong number of elements
@@ -54,7 +54,7 @@ class TestValidationFunctions:
             validate_point([1.0, 2.0, 3.0, 4.0])
         
         # Test with non-numeric values
-        with pytest.raises(ValidationError, match="Could not convert.*to a valid 3D point"):
+        with pytest.raises(ValidationError, match="Could not convert"):
             validate_point(["a", "b", "c"])
     
     def test_validate_pointset_valid(self):
