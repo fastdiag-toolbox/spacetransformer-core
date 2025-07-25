@@ -3,7 +3,6 @@
 A Python library for elegant 3D medical image geometric transformations.
 
 
-
 ## Why SpaceTransformer?
 
 Traditional medical image processing suffers from fragmented coordinate concepts:
@@ -13,6 +12,7 @@ Traditional medical image processing suffers from fragmented coordinate concepts
 - **Manual bookkeeping**: Keeping track of transformations across multiple processing steps
 
 SpaceTransformer introduces the **Space** concept - a complete description of 3D image geometry.
+
 
 ## Key Advantages
 
@@ -91,6 +91,8 @@ result = warp_image(image, source_space, target_space, cuda_device="cuda:0")
 - **spacetransformer-torch**: GPU-accelerated image resampling with PyTorch
 
 ## Quick Start
+
+**[View Example Notebook](example/example.ipynb)** - See a practical demonstration of the library's capabilities
 
 ```python
 import numpy as np

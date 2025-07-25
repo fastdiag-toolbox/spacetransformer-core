@@ -45,23 +45,16 @@ def validate_point(point: Any, name: str = "point") -> np.ndarray:
         array([1., 2., 3.])
         >>> validate_point([1, 2])  # Will raise ValidationError
     """
-    if not isinstance(point, (list, tuple, np.ndarray)):
-        raise ValidationError(
-            f"{name} must be a list, tuple, or array, got {type(point).__name__}"
-        )
-        
     try:
         point_np = np.asarray(point, dtype=float)
-        if point_np.size != 3:
-            raise ValidationError(
-                f"{name} must have exactly 3 elements, got {point_np.size}"
-            )
-        return point_np.reshape(-1)
     except Exception as e:
-        if isinstance(e, ValidationError):
-            raise
-        raise ValidationError(f"Could not convert {name} to a valid 3D point: {e}")
-    return point_np
+        raise ValidationError(f"Could not convert {name} to a numpy array: {e}")
+        
+    if point_np.size != 3:
+        raise ValidationError(
+            f"{name} must have exactly 3 elements, got {point_np.size}"
+        )
+    return point_np.reshape(-1)
 
 def validate_orientation(orientation: Any, name: str = "orientation") -> np.ndarray:
     """Validate a single 3D point.

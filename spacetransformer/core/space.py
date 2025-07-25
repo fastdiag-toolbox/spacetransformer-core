@@ -905,7 +905,8 @@ class Space:
         Args:
             factor: Scaling factor(s). Can be a single float or tuple of 3 floats
             mode: Rounding mode for non-integer results ("floor", "round", "ceil")
-            align_corners: Currently ignored for backward compatibility
+            align_corners: If True, maintain alignment at corner pixels,
+                        similar to PyTorch's grid_sample align_corners parameter
             
         Returns:
             Space: New Space instance with scaled shape
@@ -1018,8 +1019,7 @@ class Space:
         self,
         axis: int,
         angle: float,
-        *,
-        unit: str = "radian",
+        unit: str = "degree",
         center: str = "center",
     ) -> "Space":
         """Rotate the space around a specified axis.
