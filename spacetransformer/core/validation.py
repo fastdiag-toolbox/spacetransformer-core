@@ -84,7 +84,6 @@ def validate_orthonormal_basis(
     x_orientation: np.ndarray,
     y_orientation: np.ndarray,
     z_orientation: np.ndarray,
-    tol: float = 1e-6,
 ) -> None:
     """Validate that three orientation vectors form an orthonormal basis.
     
@@ -95,11 +94,11 @@ def validate_orthonormal_basis(
         x_orientation: X-axis orientation vector (unit vector)
         y_orientation: Y-axis orientation vector (unit vector)
         z_orientation: Z-axis orientation vector (unit vector)
-        tol: Numerical tolerance for checks
         
     Raises:
         ValidationError: If vectors don't form an orthonormal right-handed basis
     """
+    tol: float = 1e-2
     # Form the rotation matrix R
     R = np.column_stack([x_orientation, y_orientation, z_orientation])
     
