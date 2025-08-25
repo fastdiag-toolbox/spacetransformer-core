@@ -9,9 +9,9 @@ Design Philosophy:
     vectors to ensure compatibility with medical imaging standards (DICOM, NIfTI).
     This design choice prioritizes correctness over performance for medical applications.
     
-    The coordinate system follows the convention where:
-    - x-axis points right (patient left to right)
-    - y-axis points anterior (patient posterior to anterior)  
+    The coordinate system follows the LPS convention where:
+    - x-axis points left (patient right to left) 
+    - y-axis points posterior (patient anterior to posterior)  
     - z-axis points superior (patient inferior to superior)
 
 Example:
@@ -318,33 +318,48 @@ class Space:
         The affine matrix combines rotation, scaling, and translation into a single
         4x4 homogeneous transformation matrix following NIfTI conventions.
         
+        Since this Space uses LPS coordinates but NIfTI expects RAS coordinates,
+        the matrix is converted from LPS to RAS before output.
+        
         Returns:
-            np.ndarray: 4x4 affine transformation matrix
+            np.ndarray: 4x4 affine transformation matrix in RAS coordinates
             
         Example:
             >>> space = Space(shape=(100, 100, 50), spacing=(1.0, 1.0, 2.0))
             >>> affine = space.to_nifti_affine()
             >>> print(affine.shape)
             (4, 4)
-            >>> print(affine[0, 0])  # x-spacing
-            1.0
+            >>> print(affine[0, 0])  # x-spacing (will be negative due to LPS->RAS conversion)
+            -1.0
             >>> print(affine[2, 2])  # z-spacing
             2.0
         """
-        # Rotation matrix R from orientation cosines
-        R = np.array(
-            [self.x_orientation, self.y_orientation, self.z_orientation]
-        ).T  # Shape (3, 3)
+        # Current space is in LPS coordinates
+        # Convert to RAS for NIfTI output
+        
+        # Convert orientation: flip x and y direction vectors back to RAS
+        orientation_lps = np.column_stack([self.x_orientation, self.y_orientation, self.z_orientation])
+        orientation_ras = orientation_lps.copy()
+        orientation_ras[:, 0] = -orientation_lps[:, 0]  # flip x orientation
+        orientation_ras[:, 1] = -orientation_lps[:, 1]  # flip y orientation
+        # z orientation remains the same
+        
+        # Convert origin: flip x and y coordinates back to RAS
+        origin_lps = np.array(self.origin)
+        origin_ras = origin_lps.copy()
+        origin_ras[0] = -origin_lps[0]  # flip x
+        origin_ras[1] = -origin_lps[1]  # flip y
+        # z remains the same
 
         # Scaling matrix S from spacing
         S = np.diag(self.spacing)
 
-        # Compute affine transformation matrix
-        affine = np.eye(4)
-        affine[:3, :3] = np.dot(R, S)
-        affine[:3, 3] = self.origin
+        # Compute affine transformation matrix in RAS coordinates
+        affine_ras = np.eye(4)
+        affine_ras[:3, :3] = np.dot(orientation_ras, S)
+        affine_ras[:3, 3] = origin_ras
 
-        return affine
+        return affine_ras
 
     def to_dicom_orientation(self) -> Tuple[float, ...]:
         """Convert orientation vectors to DICOM Image Orientation (Patient) format.
@@ -1203,11 +1218,15 @@ def get_space_from_nifti(niftiimage: "NiftiImage") -> "Space":
     This function extracts geometric information from a NIfTI image including
     orientation, spacing, and origin information from the affine matrix.
     
+    Priority is given to qform affine matrix, with fallback to sform affine.
+    Coordinate system is converted from RAS (NIfTI default) to LPS (medical imaging standard)
+    by inverting x and y axes.
+    
     Args:
         niftiimage: NIfTI image object with affine matrix and shape
         
     Returns:
-        Space: A new Space instance with geometry matching the NIfTI image
+        Space: A new Space instance with geometry matching the NIfTI image in LPS coordinates
         
     Raises:
         ValueError: If affine matrix is not 4x4
@@ -1221,22 +1240,52 @@ def get_space_from_nifti(niftiimage: "NiftiImage") -> "Space":
         >>> print(space.spacing)
         (1.0, 1.0, 1.0)
     """
-    affine = niftiimage.affine
+    # Priority: qform over sform
+    try:
+        # Try to get qform affine matrix first
+        qform_affine, qform_code = niftiimage.get_qform(coded=True)
+        if qform_code > 0:
+            affine = qform_affine
+        else:
+            # Fallback to default affine (usually sform)
+            affine = niftiimage.affine
+    except (AttributeError, TypeError):
+        # Fallback for objects without get_qform method
+        affine = niftiimage.affine
+    
     shape = niftiimage.shape
 
     if affine.shape != (4, 4):
         raise ValueError("Affine matrix must be 4x4.")
 
-    # Extract direction cosines and spacing
-    R = affine[:3, :3]  # Extract rotation part
-    spacing = np.linalg.norm(R, axis=0)  # Spacing is column norms
-    orientation = R / spacing  # Normalize direction cosines
+    # Extract direction cosines and spacing from RAS affine
+    R_ras = affine[:3, :3]  # Extract rotation part
+    spacing = np.linalg.norm(R_ras, axis=0)  # Spacing is column norms
+    orientation_ras = R_ras / spacing  # Normalize direction cosines
+    origin_ras = affine[:3, 3]  # Extract origin in RAS
 
-    origin = tuple(affine[:3, 3].tolist())  # Extract origin
-    x_orientation = tuple(orientation[:, 0].tolist())
-    y_orientation = tuple(orientation[:, 1].tolist())
-    z_orientation = tuple(orientation[:, 2].tolist())
+    # Convert from RAS to LPS coordinate system
+    # In RAS: x=right, y=anterior, z=superior
+    # In LPS: x=left, y=posterior, z=superior  
+    # This requires inverting x and y axes for both origin and orientation
+    
+    # Convert origin: flip x and y coordinates
+    origin_lps = origin_ras.copy()
+    origin_lps[0] = -origin_ras[0]  # flip x
+    origin_lps[1] = -origin_ras[1]  # flip y
+    # z remains the same
+    
+    # Convert orientation: flip x and y direction vectors
+    orientation_lps = orientation_ras.copy()
+    orientation_lps[:, 0] = -orientation_ras[:, 0]  # flip x orientation
+    orientation_lps[:, 1] = -orientation_ras[:, 1]  # flip y orientation
+    # z orientation remains the same
 
+    origin = tuple(origin_lps.tolist())
+    x_orientation = tuple(orientation_lps[:, 0].tolist())
+    y_orientation = tuple(orientation_lps[:, 1].tolist())
+    z_orientation = tuple(orientation_lps[:, 2].tolist())
+    
     return Space(
         origin=origin,
         spacing=tuple(spacing.tolist()),
