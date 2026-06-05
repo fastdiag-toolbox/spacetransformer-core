@@ -2,12 +2,14 @@ import os
 import sys
 import unittest
 import numpy as np
+import pytest
 
 CORE_ROOT = os.path.abspath(os.path.join(__file__, "../.."))
 if CORE_ROOT not in sys.path:
     sys.path.insert(0, CORE_ROOT)
 
 from spacetransformer.core.space import Space
+import spacetransformer.core.pointset_warpers as pointset_warpers
 from spacetransformer.core.pointset_warpers import calc_transform, warp_point, warp_vector
 
 
@@ -115,6 +117,52 @@ class TestPointWarpers(unittest.TestCase):
         vecs_array = np.array(vecs_list)
         warp_multi_array = warp_vector(vecs_array, s, t)
         self.assertTrue(np.allclose(warp_multi, warp_multi_array, atol=1e-6))
+
+    def test_module_does_not_import_torch_eagerly(self):
+        self.assertNotIn("torch", pointset_warpers.__dict__)
+
+    def test_warp_point_torch_tensor_matches_numpy_without_cpu_roundtrip(self):
+        torch = pytest.importorskip("torch")
+        s = self._random_space()
+        t = self._random_space()
+        points_np = np.random.rand(128, 3).astype(np.float32) * (np.asarray(s.shape, dtype=np.float32) - 1)
+        points = torch.as_tensor(points_np)
+
+        warp_torch, isin_torch = warp_point(points, s, t)
+        warp_np, isin_np = warp_point(points_np, s, t)
+
+        self.assertIsInstance(warp_torch, torch.Tensor)
+        self.assertIsInstance(isin_torch, torch.Tensor)
+        self.assertEqual(warp_torch.device, points.device)
+        torch.testing.assert_close(warp_torch.cpu(), torch.as_tensor(warp_np, dtype=warp_torch.dtype), rtol=1e-5, atol=1e-5)
+        np.testing.assert_array_equal(isin_torch.cpu().numpy(), isin_np)
+
+    def test_warp_vector_torch_tensor_matches_numpy_without_cpu_roundtrip(self):
+        torch = pytest.importorskip("torch")
+        s = self._random_space()
+        t = self._random_space()
+        vecs_np = np.random.randn(128, 3).astype(np.float32)
+        vecs = torch.as_tensor(vecs_np)
+
+        warp_torch = warp_vector(vecs, s, t)
+        warp_np = warp_vector(vecs_np, s, t)
+
+        self.assertIsInstance(warp_torch, torch.Tensor)
+        self.assertEqual(warp_torch.device, vecs.device)
+        torch.testing.assert_close(warp_torch.cpu(), torch.as_tensor(warp_np, dtype=warp_torch.dtype), rtol=1e-5, atol=1e-5)
+
+    def test_warp_point_preserves_cuda_device(self):
+        torch = pytest.importorskip("torch")
+        if not torch.cuda.is_available():
+            self.skipTest("requires CUDA")
+        s = self._random_space()
+        t = self._random_space()
+        points = torch.rand((128, 3), dtype=torch.float32, device="cuda")
+
+        warp_torch, isin_torch = warp_point(points, s, t)
+
+        self.assertEqual(warp_torch.device.type, "cuda")
+        self.assertEqual(isin_torch.device.type, "cuda")
 
 
 if __name__ == "__main__":

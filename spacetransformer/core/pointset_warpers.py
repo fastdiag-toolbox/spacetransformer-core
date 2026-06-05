@@ -20,21 +20,53 @@ Example:
 """
 
 from __future__ import annotations
-from typing import Tuple, Union
+from typing import Any, Tuple, Union
 import numpy as np
-
-try:
-    import torch
-    _has_torch = True
-except ImportError:  # pragma: no cover
-    torch = None  # type: ignore
-    _has_torch = False
 
 from .space import Space
 from .transform import Transform
 
 
 ArrayLike = Union["torch.Tensor", np.ndarray, list, tuple]
+
+
+def _torch_if_tensor(value: Any):
+    """Lazily import torch only when the input is already a torch tensor."""
+    value_type = type(value)
+    if not value_type.__module__.startswith("torch"):
+        return None
+    import torch
+
+    return torch if isinstance(value, torch.Tensor) else None
+
+
+def _validate_torch_pointset(tensor: "torch.Tensor", *, name: str) -> "torch.Tensor":
+    from .exceptions import ValidationError
+
+    if tensor.ndim == 1:
+        if tensor.shape[0] != 3:
+            raise ValidationError(f"{name} single point must have length 3")
+        tensor = tensor[None, :]
+    if tensor.ndim != 2 or tensor.shape[1] != 3:
+        raise ValidationError(f"{name} shape must be (N,3)")
+    return tensor
+
+
+def _torch_matrix(matrix: np.ndarray, reference: "torch.Tensor") -> "torch.Tensor":
+    import torch
+
+    dtype = reference.dtype if torch.is_floating_point(reference) else torch.get_default_dtype()
+    return torch.as_tensor(matrix, dtype=dtype, device=reference.device)
+
+
+def _apply_torch_transform(points: "torch.Tensor", transform: Transform, *, w: float) -> "torch.Tensor":
+    import torch
+
+    matrix = _torch_matrix(transform.matrix, points)
+    points = points.to(dtype=matrix.dtype)
+    w_col = torch.full((points.shape[0], 1), w, dtype=matrix.dtype, device=points.device)
+    points_h = torch.cat([points, w_col], dim=1)
+    return (points_h @ matrix.T)[:, :3]
 
 
 def calc_transform(source: Space, target: Space) -> Transform:
@@ -111,13 +143,16 @@ def warp_point(
     source = validate_space(source, name="source")
     target = validate_space(target, name="target")
     
-    istorch = False
-    if _has_torch and isinstance(point_set, torch.Tensor):
-        device = point_set.device
-        istorch = True
-        point_set_np = point_set.cpu().numpy()
-    else:
-        point_set_np = np.asarray(point_set)
+    torch_mod = _torch_if_tensor(point_set)
+    if torch_mod is not None:
+        point_set_tensor = _validate_torch_pointset(point_set, name="point_set")
+        T = calc_transform(source, target)
+        warp_pts = _apply_torch_transform(point_set_tensor, T, w=1.0)
+        target_shape = torch_mod.as_tensor(target.shape, dtype=warp_pts.dtype, device=warp_pts.device)
+        isin = torch_mod.all((warp_pts >= 0) & (warp_pts <= target_shape[None] - 1), dim=1)
+        return warp_pts, isin
+
+    point_set_np = np.asarray(point_set)
 
     # Validate point set
     try:
@@ -137,12 +172,7 @@ def warp_point(
 
     isin = np.all((warp_pts >= 0) & (warp_pts <= np.array(target.shape)[None] - 1), axis=1)
 
-    if istorch:
-        warp_pts_tensor = torch.from_numpy(warp_pts).to(device=device)
-        isin_tensor = torch.from_numpy(isin).to(device=device)
-        return warp_pts_tensor, isin_tensor
-    else:
-        return warp_pts, isin
+    return warp_pts, isin
 
 
 def warp_vector(
@@ -184,13 +214,13 @@ def warp_vector(
     source = validate_space(source, name="source")
     target = validate_space(target, name="target")
     
-    istorch = False
-    if _has_torch and isinstance(vector_set, torch.Tensor):
-        device = vector_set.device
-        istorch = True
-        vec_np = vector_set.cpu().numpy()
-    else:
-        vec_np = np.asarray(vector_set)
+    torch_mod = _torch_if_tensor(vector_set)
+    if torch_mod is not None:
+        vec_tensor = _validate_torch_pointset(vector_set, name="vector_set")
+        T = calc_transform(source, target)
+        return _apply_torch_transform(vec_tensor, T, w=0.0)
+
+    vec_np = np.asarray(vector_set)
 
     # Validate vector set
     try:
@@ -208,7 +238,4 @@ def warp_vector(
     T = calc_transform(source, target)
     warp_vec = T.apply_vector(vec_np)
 
-    if istorch:
-        return torch.from_numpy(warp_vec).to(device=device, dtype=vector_set.dtype)
-    else:
-        return warp_vec.astype(dtype) 
+    return warp_vec.astype(dtype) 
