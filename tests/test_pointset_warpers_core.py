@@ -164,6 +164,18 @@ class TestPointWarpers(unittest.TestCase):
         self.assertEqual(warp_torch.device.type, "cuda")
         self.assertEqual(isin_torch.device.type, "cuda")
 
+    def test_warp_vector_preserves_cuda_device(self):
+        torch = pytest.importorskip("torch")
+        if not torch.cuda.is_available():
+            self.skipTest("requires CUDA")
+        s = self._random_space()
+        t = self._random_space()
+        vectors = torch.rand((128, 3), dtype=torch.float32, device="cuda")
+
+        warp_torch = warp_vector(vectors, s, t)
+
+        self.assertEqual(warp_torch.device.type, "cuda")
+
 
 if __name__ == "__main__":
     unittest.main() 
